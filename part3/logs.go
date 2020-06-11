@@ -11,6 +11,8 @@ import (
 type LogLevel int
 
 var (
+	defaultServiceName     =   "default" //定义默认服务名变量
+	lm          *LoggerMgr //定义一个LoggerMgr类型的变量
 	initOnce    *sync.Once = &sync.Once{} //这个主要是解决多线程调用日志库带来的并发问题
 )
 
@@ -25,6 +27,7 @@ type LogField struct {
 	fieldLock  sync.Mutex //加锁防止并发问题
 }
 
+//定义日志数据结构
 type LogData struct {
 	curTime         time.Time   //日志记录的当前时间
 	message         string   //日志信息
@@ -37,6 +40,15 @@ type LogData struct {
 	fields          *LogField //日志信息的其他字段，比如访问日志，传入用户名等字段
 }
 
+//定义一个日志管理结构
+type LoggerMgr struct {
+	outputers      []Outputer  //日志输出器
+	chanSize       int     //管道缓冲区大小
+	level          LogLevel    //日志等级
+	logDataChan    chan *LogData  //分配日志管道
+	serviceName    string   //产生日志服务名称
+	wg             sync.WaitGroup   //阻塞等待日志协程写完才继续执行程序
+}
 //对外暴露日志函数,将日志分为访问，调试，追踪，普通，警告，错误六种级别
 func Access(ctx context.Context, format string, args ...interface{}) {
 	fmt.Printf("hi!该函数产生访问级别的日志记录:%v\n",format)

@@ -8,6 +8,46 @@
 
 在logs.go文件中加入如下代码
 ```go
+    package zy_logs
+    
+    import (
+    	"fmt"
+    	"sync"
+    	"time"
+    	"context"
+    )
+    
+    //定义日志等级数据类型，便于后面定义日志等级属性
+    type LogLevel int
+    
+    var (
+    	initOnce    *sync.Once = &sync.Once{} //这个主要是解决多线程调用日志库带来的并发问题
+    )
+    
+    //日志记录数据中可能会加入其他字段，例如访问日志会传入用户名等字段
+    type KeyVal struct {
+    	key interface{}
+    	val interface{}
+    }
+    
+    type LogField struct {
+    	kvs []KeyVal
+    	fieldLock  sync.Mutex //加锁防止并发问题
+    }
+    
+    //定义日志数据结构
+    type LogData struct {
+    	curTime         time.Time   //日志记录的当前时间
+    	message         string   //日志信息
+    	timeStr         string   //日志记录当前时间的格式化
+    	level           LogLevel  //日志级别
+    	fileName        string   //产生日志的文件名
+    	lineNo          int     //产生日志的文件行号
+    	traceId         string  //追踪id便于分布式的聚合
+    	serviceName     string  //产生日志的服务名，这里可以在初始化设置
+    	fields          *LogField //日志信息的其他字段，比如访问日志，传入用户名等字段
+    }
+    
     //对外暴露日志函数,将日志分为访问，调试，追踪，普通，警告，错误六种级别
     func Access(ctx context.Context, format string, args ...interface{}) {
     	fmt.Printf("hi!该函数产生访问级别的日志记录:%v\n",format)
@@ -26,10 +66,6 @@
     
     func Warn(ctx context.Context, format string, args ...interface{}) {
     	fmt.Printf("hi!该函数产生警告级别的日志记录:%v\n",format)
-    }
-    
-    func Error(ctx context.Context, format string, args ...interface{}) {
-    	fmt.Printf("hi!该函数产生错误级别的日志记录:%v\n",format)
     }
 ```
 
@@ -70,5 +106,40 @@
 
 则说明定义的函数可以正常使用，之后每当完成一个功能的单元测试就不再此教程中演示了，因为大同小异大家可以以此类推。
 
+接下来开始初始化日志库，在consts.go 文件中定义日志数据结构用到的分隔符常量
+```go
+package zy_logs
 
+const (
+	//日志级别
+	LogLevelDebug  LogLevel = iota
+	LogLevelTrace
+	LogLevelAccess
+	LogLevelInfo
+	LogLevelWarn
+	LogLevelError
+)
+
+const (
+	DefaultLogChanSize = 20000
+	SpaceSep           = " "
+	ColonSep           = ":"
+	LineSep            = "\n"
+)
+
+```
+还需要定义一个日志库管理结构体，在logs.go文件中加入一下代码
+```go
+//定义一个日志管理结构
+type LoggerMgr struct {
+	outputers      []Outputer  //日志输出器
+	chanSize       int     //管道缓冲区大小
+	level          LogLevel    //日志等级
+	logDataChan    chan *LogData  //分配日志管道
+	serviceName    string   //产生日志服务名称
+	wg             sync.WaitGroup   //阻塞等待日志协程写完才继续执行程序
+}
+```
+ 紧接着定义一个LoggerMgr 类型的变量lm，定义默认服务名变量defaultServiceName
+ 
 

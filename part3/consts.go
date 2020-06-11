@@ -9,3 +9,10 @@ const (
 	LogLevelWarn
 	LogLevelError
 )
+
+const (
+	DefaultLogChanSize = 20000
+	SpaceSep           = " "
+	ColonSep           = ":"
+	LineSep            = "\n"
+)
