@@ -49,6 +49,28 @@ type LoggerMgr struct {
 	serviceName    string   //产生日志服务名称
 	wg             sync.WaitGroup   //阻塞等待日志协程写完才继续执行程序
 }
+
+//定义初始化日志方法
+func initLogger(level LogLevel, chanSize int, serviceName string) {
+	initOnce.Do(func() {
+		lm = &LoggerMgr{
+			chanSize:chanSize,
+			level:level,
+			serviceName:serviceName,
+			logDataChan:make(chan *LogData,chanSize),
+		}
+	})
+}
+
+//定义对外初始化日志
+func InitLogger(level LogLevel,chanSize int,serviceName string)  {
+	if chanSize <= 0{
+		chanSize = DefaultLogChanSize;
+	}
+
+	initLogger(level,chanSize,serviceName)
+}
+
 //对外暴露日志函数,将日志分为访问，调试，追踪，普通，警告，错误六种级别
 func Access(ctx context.Context, format string, args ...interface{}) {
 	fmt.Printf("hi!该函数产生访问级别的日志记录:%v\n",format)
