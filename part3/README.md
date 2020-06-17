@@ -265,3 +265,67 @@ func Error(ctx context.Context, format string, args ...interface{}) {
 	fmt.Printf("hi!该函数产生错误级别的日志记录:%v\n",format)
 }
 ```
+接下来开始写产生日志的相关方法，日志最重要的一个功能就是显示日志是哪个程序文件的哪行代码产生的，所以我们先写一个获取生成日志的文件名的方法。
+创建util.go文件，在里面创建GetLineInfo方法来获取产生日志文件的文件名和行数。
+```go
+package zy_logs
+
+import (
+	"runtime"
+)
+
+//获取生成日志的文件名和行数
+func GetLineInfo() (fileName string,lineNo int) {
+	_, fileName, lineNo, _ = runtime.Caller(3)
+
+	return
+}
+
+```
+
+在日志中我们还用到追踪日志记录（这个追踪日志方面我只是简单的实现），定义追踪日志需要的文件trace_id.go
+在里面定义生成traceId方法，将traceId存入上下文方法，从上下文中获取traceId方法。
+
+```go
+package zy_logs
+
+import (
+	"context"
+	"fmt"
+	"math/rand"
+	"time"
+)
+
+const (
+	MaxTraceId = 100000000
+)
+
+type traceIdKey struct {}
+
+func init()  {
+	rand.Seed(time.Now().UnixNano())
+}
+/*获取traceId*/
+func GetTraceId(ctx context.Context) (traceId string)  {
+	traceId,ok := ctx.Value(traceIdKey{}).(string)
+	if !ok {
+		traceId = "-"
+	}
+	return
+}
+/*生成traceId*/
+func GenTraceId() (traceId string) {
+	now := time.Now()
+	traceId = fmt.Sprintf("%04d%02d%02d%02d%02d%02d%08d", now.Year(), now.Month(), now.Day(),
+		now.Hour(), now.Minute(), now.Second(), rand.Int31n(MaxTraceId))
+	return
+}
+/*将traceId放入ctx*/
+func WithTraceId(ctx context.Context, traceId string) context.Context{
+	return context.WithValue(ctx, traceIdKey{}, traceId)
+}
+```
+
+
+
+
