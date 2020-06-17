@@ -326,6 +326,261 @@ func WithTraceId(ctx context.Context, traceId string) context.Context{
 }
 ```
 
+还可以定义一些日志分级的常量，这样就可以选择日志分级常量而不用手动输入参数了。
+在util.go 中添加如下代码
+
+```go
+/*获取日志等级字符串*/
+...
+
+func getLevelText(level LogLevel) string{
+	switch level {
+	case LogLevelAccess:
+		return "ACCESS"
+	case LogLevelDebug:
+		return "DEBUG"
+	case LogLevelTrace:
+		return "TRACE"
+	case LogLevelInfo:
+		return "INFO"
+	case LogLevelWarn:
+		return "WARN"
+	case LogLevelError:
+		return "ERROR"
+	}
+	return "UNKNOWN"
+}
+/*根据日志等级字符串返回日志等级*/
+func GetLogLevel(level string) LogLevel {
+	switch level {
+	case "debug":
+		return LogLevelDebug
+	case "trace":
+		return LogLevelTrace
+	case "info":
+		return LogLevelInfo
+	case "warn":
+		return LogLevelWarn
+	case "error":
+		return LogLevelError
+	}
+	return LogLevelDebug
+}
+
+...
+
+
+```
+另外我们还需要定义一些方法，将日志的字段进行一些处理
+```go
+
+...
+
+/*将字段写入到buffer缓存进行拼接*/
+func writeField(buffer *bytes.Buffer,field,sep string)  {
+	buffer.WriteString(field)
+	buffer.WriteString(sep)
+}
+
+/*将结构体的日志数据转化为字节数组*/
+func (l *LogData)Bytes() []byte {
+	var buffer bytes.Buffer
+	levelStr := getLevelText(l.level)
+
+	writeField(&buffer,l.timeStr,SpaceSep)
+	writeField(&buffer,levelStr,SpaceSep)
+	writeField(&buffer,l.serviceName,SpaceSep)
+
+	writeField(&buffer,l.fileName,ColonSep)
+	writeField(&buffer,fmt.Sprintf("%d",l.lineNo),SpaceSep)
+	writeField(&buffer,l.traceId,SpaceSep)
+	if l.level == LogLevelAccess && l.fields != nil {
+		for _,field := range l.fields.kvs {
+			writeField(&buffer, fmt.Sprintf("%v=%v",field.key,field.val),SpaceSep)
+		}
+	}
+
+	writeField(&buffer,l.message,LineSep)
+
+	return buffer.Bytes()
+
+}
+
+...
+
+```
+当日志输出到控制台的时候，希望日志的显示根据分级的不同而显示不同的颜色，起到让错误日志显眼的作用，例如颜色为红色的是严重错误的日志
+首先需要在常量文件中定义一些颜色常量
+
+```go
+
+const (
+	//日志控制台输出颜色，经测试貌似只对linux操作系统有效
+	Black Color = iota + 30
+	Red
+	Green
+	Yellow
+	Blue
+	Magenta
+	Cyan
+	White
+)
+
+```
+在util中定义
+```go
+
+...
+
+/*根据日志级别获取不同颜色*/
+func getLevelColor(level LogLevel) Color {
+	switch level {
+	case LogLevelAccess:
+		return Blue
+	case LogLevelDebug:
+		return White
+	case LogLevelTrace:
+		return Cyan
+	case LogLevelInfo:
+		return Green
+	case LogLevelWarn:
+		return Yellow
+	case LogLevelError:
+		return Red
+	}
+	return Magenta
+}
+
+...
+
+```
+新建文件color.go
+```go
+package zy_logs
+
+import "fmt"
+
+type Color uint8
+
+func (c Color)WithColor(s string) string{
+	return fmt.Sprintf("\x1b[%dm%s\x1b[0m",uint8(c),s)
+}
+
+```
+日志存储的日志文件我们是按照时间来进行切分的，定义切分日志文件的方法
+同样在常量文件中定义文件切割符常量
+
+```go
+
+const (
+	YearSeg LogFileSeg = iota
+	MonthSeg
+	WeekSeg
+	DaySeg
+	HourSeg
+)
+
+```
+
+在util中定义
+```go
+
+...
+
+/*日志文件的切分时段*/
+type LogFileSeg int
+/*获取日志等级字符串*/
+func getSegText(seg LogFileSeg) string{
+	switch seg {
+	case YearSeg:
+		return "year"
+	case MonthSeg:
+		return "month"
+	case WeekSeg:
+		return "week"
+	case DaySeg:
+		return "day"
+	case HourSeg:
+		return "hour"
+	}
+	return "hour"
+}
+/*根据日志等级字符串返回日志等级*/
+func GetFileSeg(seg string) LogFileSeg {
+	switch seg {
+	case "year":
+		return YearSeg
+	case "month":
+		return MonthSeg
+	case "week":
+		return WeekSeg
+	case "day":
+		return DaySeg
+	}
+	return HourSeg
+}
+
+...
+
+```
+访问日志有时候需要用户自己在日志数据结构中定义一些自己的字段，将用户访问日志自定义字段相关的方法写在kvs.go文件中
+
+```go
+package zy_logs
+
+import (
+	"context"
+	"sync"
+)
+
+var (
+	initFields sync.Once
+)
+
+type KeyVal struct {
+	key interface{}
+	val interface{}
+}
+
+type LogField struct {
+	kvs []KeyVal
+	fieldLock sync.Mutex //添加一个锁，为何加锁，因为AddField可能是多个线程在调用的
+}
+
+type kvsIdKey struct {}
+
+/*将用户传入字段格式化*/
+func (l*LogField) AddField(key , val interface{}) {
+	l.fieldLock.Lock()
+	l.kvs = append(l.kvs,KeyVal{key:key,val:val})
+	l.fieldLock.Unlock()
+}
+
+/* 将字段存入上下文*/
+func WithFieldContext(ctx context.Context) context.Context {
+	fields := &LogField{}
+	return context.WithValue(ctx, kvsIdKey{},fields)
+}
+/*向日志数据中添加其他字段*/
+func AddField(ctx context.Context,key string,val interface{})  {
+	field := getFields(ctx)
+	if field == nil {
+		return
+	}
+	field.AddField(key,val)
+}
+/*从上下文中获取其他字段*/
+func getFields(ctx context.Context) *LogField {
+	field, ok := ctx.Value(kvsIdKey{}).(*LogField)
+	if !ok {
+		return nil
+	}
+	return field
+}
+
+```
+
+
 
 
 

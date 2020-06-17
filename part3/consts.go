@@ -16,3 +16,23 @@ const (
 	ColonSep           = ":"
 	LineSep            = "\n"
 )
+
+const (
+	//日志控制台输出颜色，经测试貌似只对linux操作系统有效
+	Black Color = iota + 30
+	Red
+	Green
+	Yellow
+	Blue
+	Magenta
+	Cyan
+	White
+)
+
+const (
+	YearSeg LogFileSeg = iota
+	MonthSeg
+	WeekSeg
+	DaySeg
+	HourSeg
+)

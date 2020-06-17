@@ -8,7 +8,7 @@ import (
 )
 
 //定义日志等级数据类型，便于后面定义日志等级属性
-type LogLevel int
+//type LogLevel int 将其移动到util
 
 var (
 	defaultServiceName     =   "default" //定义默认服务名变量
@@ -17,15 +17,15 @@ var (
 )
 
 //日志记录数据中可能会加入其他字段，例如访问日志会传入用户名等字段
-type KeyVal struct {
+/*type KeyVal struct {
 	key interface{}
 	val interface{}
-}
+}*/
 
-type LogField struct {
+/*type LogField struct {
 	kvs []KeyVal
 	fieldLock  sync.Mutex //加锁防止并发问题
-}
+}*/
 
 //定义日志数据结构
 type LogData struct {
