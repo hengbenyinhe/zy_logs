@@ -171,7 +171,6 @@ func Error(ctx context.Context, format string, args ...interface{}) {
  - [第五章 易用性封装][第五章]
  - [第六章 功能优化][第六章]
  - [第七章 功能测试][第七章]
- - [第八章 学习总结][第八章]
  
  [第一章]: ../part1
  [第二章]: ../part2

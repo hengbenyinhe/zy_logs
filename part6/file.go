@@ -8,17 +8,26 @@ import (
 )
 
 type FileOutputerOptions struct {
-	filename string
-	lastSplitHour int
+	filename   string //文件名
+	lastSplitHour int //记录上次切换文件小时，初始设计时用到。现在已经不用
+	lastSplitTime string //记录上次切换文件时间，考虑这种情况比如第一天日志产生时间为11点，第二天产生的时间也为11点，那么这个时候根据原来逻辑则不会切换文件
+	lastSplitWeek time.Time //便于以周为切分周期的情况
 }
 
 type FileOutputer struct {
-	file           *os.File
-	accessFile     *os.File
-	option         *FileOutputerOptions
+	file    *os.File
+	accessFile *os.File
+	option   *FileOutputerOptions
 }
 
-func NewFileOutputer(filename string) (Outputer,error) {
+
+var (
+	cutTime string //文件切分时段
+)
+
+//创建文件输出器实例
+func NewFileOutputer(filename string,cuttime LogFileSeg) (Outputer,error) {
+	cutTime = getSegText(cuttime)
 
 	filename,err := filepath.Abs(filename)
 	if err != nil {
@@ -34,62 +43,122 @@ func NewFileOutputer(filename string) (Outputer,error) {
 	err = log.init()
 	return log,err
 }
-
-func (f *FileOutputer)getCurFilename() (curFilename,originFilename string)  {
+/*生成日志文件名*/
+func (f *FileOutputer)getCurFilename(cuttime string) (curFilename,originFilename string) {
 	now := time.Now()
-	curFilename = fmt.Sprintf("%s.%04d%02d%02d%02d",f.option.filename,now.Year(),now.Month(),
-		now.Day(),now.Hour())
+	/*curFilename = fmt.Sprintf("%s.%04d%02d%02d%02d",f.option.filename,now.Year(),now.Month(),
+	now.Day(),now.Hour())*/
+	switch cuttime {
+	case "day":
+		curFilename = fmt.Sprintf("%s.%04d%02d%02d",f.option.filename,now.Year(),now.Month(),now.Day())
+	case "week":
+		curFilename = fmt.Sprintf("%s.%04d%02d%02d",f.option.filename,now.Year(),now.Month(),now.Day())
+	case "month":
+		curFilename = fmt.Sprintf("%s.%04d%02d",f.option.filename,now.Year(),now.Month())
+	case "year":
+		curFilename = fmt.Sprintf("%s.%04d",f.option.filename,now.Year())
+	default:
+		curFilename = fmt.Sprintf("%s.%04d%02d%02d%02d",f.option.filename,now.Year(),now.Month(),
+			now.Day(),now.Hour())
+	}
 	originFilename = f.option.filename
 	return
 }
-
-func (f *FileOutputer)getCurAccessFilename() (curAccessFilename,originAccessFilename string) {
+/*生成访问日志文件名*/
+func (f *FileOutputer)getCurAccessFilename(cuttime string) (curAccessFilename,originAccessFilename string) {
 	now := time.Now()
-	curAccessFilename = fmt.Sprintf("%s.access.%04d%02d%02d%02d",f.option.filename,now.Year(),now.Month(),
-		now.Day(),now.Hour())
-	originAccessFilename = f.option.filename
+	/*curAccessFilename = fmt.Sprintf("%s.access.%04d%02d%02d%02d",f.option.filename,now.Year(),now.Month(),
+	now.Day(),now.Hour())*/
+	switch cuttime {
+	case "day":
+		curAccessFilename = fmt.Sprintf("%s.access.%04d%02d%02d",f.option.filename,now.Year(),now.Month(),now.Day())
+	case "week":
+		curAccessFilename = fmt.Sprintf("%s.access.%04d%02d%02d",f.option.filename,now.Year(),now.Month(),now.Day())
+	case "month":
+		curAccessFilename = fmt.Sprintf("%s.access.%04d%02d",f.option.filename,now.Year(),now.Month())
+	case "year":
+		curAccessFilename = fmt.Sprintf("%s.access.%04d",f.option.filename,now.Year())
+	default:
+		curAccessFilename = fmt.Sprintf("%s.access.%04d%02d%02d%02d",f.option.filename,now.Year(),now.Month(),
+			now.Day(),now.Hour())
+	}
+	originAccessFilename = fmt.Sprintf("%s.acccess", f.option.filename)
 	return
-
 }
 
+/*初始化文件*/
 func (f *FileOutputer)initFile(filename,originFilename string) (file *os.File,err error) {
 	file, err = os.OpenFile(filename,os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0755)
 	if err != nil {
 		err = fmt.Errorf("open faile %s failed, err:%v", filename, err)
 		return
 	}
-
 	os.Symlink(filename,originFilename)
 	return
 }
-
+/*初始化日志输出器文件*/
 func (f *FileOutputer)init() (err error) {
-	curFilename, originFileame := f.getCurFilename()
+	//curFilename, originFileame := f.getCurFilename()
+	curFilename, originFileame := f.getCurFilename(cutTime)
 	f.file,err = f.initFile(curFilename,originFileame)
 	if err !=nil {
 		return
 	}
 
-	accessFilename, originAccessFilename := f.getCurAccessFilename()
+	accessFilename, originAccessFilename := f.getCurAccessFilename(cutTime)
 	f.accessFile, err = f.initFile(accessFilename, originAccessFilename)
-	if err !=nil {
+	if err != nil {
 		return
 	}
 
-	f.option.lastSplitHour = time.Now().Hour()
+	//f.option.lastSplitHour = time.Now().Hour()
+	switch cutTime {
+	case "day":
+		f.option.lastSplitTime = fmt.Sprintf("%04d%02d%02d",time.Now().Year(),time.Now().Month(), time.Now().Day())
+	case "week":
+		f.option.lastSplitWeek = time.Now()
+	case "month":
+		f.option.lastSplitTime = fmt.Sprintf("%04d%02d",time.Now().Year(),time.Now().Month())
+	case "year":
+		f.option.lastSplitTime = fmt.Sprintf("%04d",time.Now().Year())
+	default:
+		f.option.lastSplitTime = fmt.Sprintf("%04d%02d%02d%02d",time.Now().Year(),time.Now().Month(), time.Now().Day(),time.Now().Hour())
+	}
 	return
-}
 
+}
+/*判断是否切换文件*/
 func (f *FileOutputer)checkSplitFile(curTime time.Time) {
-	hour := curTime.Hour()
-	if hour == f.option.lastSplitHour{
-		return
+	var date string
+
+	switch cutTime {
+	case "day":
+		date = fmt.Sprintf("%04d%02d%02d",curTime.Year(),curTime.Month(), curTime.Day())
+	case "month":
+		date = fmt.Sprintf("%04d%02d",curTime.Year(),curTime.Month())
+	case "year":
+		date = fmt.Sprintf("%04d",curTime.Year())
+	default:
+		date = fmt.Sprintf("%04d%02d%02d%02d",time.Now().Year(),time.Now().Month(), time.Now().Day(),time.Now().Hour())
+	}
+
+	if cutTime =="week" {
+		subM := curTime.Sub(f.option.lastSplitWeek)
+		timeHour:=int(subM.Hours())
+		days := timeHour/24
+		if days<7 {
+			return
+		}
+	}else {
+		if date == f.option.lastSplitTime{
+			return
+		}
 	}
 
 	f.init()
 }
-
-func (f *FileOutputer)Write(data *LogData) {
+/*写入日志到文件*/
+func (f *FileOutputer)Write(data *LogData)  {
 	f.checkSplitFile(data.curTime)
 	file := f.file
 	if data.level == LogLevelAccess{
@@ -98,14 +167,9 @@ func (f *FileOutputer)Write(data *LogData) {
 
 	file.Write(data.Bytes())
 }
-
+/*关闭，释放资源*/
 func (f *FileOutputer)Close() {
-
 	f.file.Close()
 	f.accessFile.Close()
-
 }
-
-
-
 
