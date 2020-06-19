@@ -57,7 +57,7 @@ func (f *FileOutputer)getCurAccessFilename() (curAccessFilename,originAccessFile
 }
 
 func (f *FileOutputer)initFile(filename,originFilename string) (file *os.File,err error) {
-	file, err = os.OpenFile(filename,os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0755
+	file, err = os.OpenFile(filename,os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0755)
 	if err != nil {
 		err = fmt.Errorf("open faile %s failed, err:%v", filename, err)
 		return
