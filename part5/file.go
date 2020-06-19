@@ -7,10 +7,6 @@ import (
 	"time"
 )
 
-type Outputer interface {
-
-}
-
 type FileOutputerOptions struct {
 	filename string
 	lastSplitHour int
