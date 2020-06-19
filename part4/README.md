@@ -149,13 +149,7 @@ func NewConsoleOutputer() (log Outputer) {
 }
 
 ```
-
-
-
-
-
-
-
+[下个章节][第五章]主要来实现日志库的记录器以及对日志库进行封装
 
  # 目录
  
