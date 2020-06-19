@@ -1,0 +1,5 @@
+19069-60-66 67:167:40.081 DEBUG account logs_test.go:19 - this is a good test
+19069-60-66 67:167:40.081 TRACE account logs_test.go:20 - this is a good test
+19069-60-66 67:167:40.081 INFO account logs_test.go:21 - this is a good test
+19069-60-66 67:167:40.081 WARN account logs_test.go:23 - this is a good test
+19069-60-66 67:167:40.081 ERROR account logs_test.go:24 - this is a good test
