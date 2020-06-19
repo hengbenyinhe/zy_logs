@@ -1,7 +1,8 @@
 # 原型实现-实现日志输出器
 
 在[上一个章节][第三章]我们定义了一些日志库需要用到的方法，这一章节主要来实现日志输出器。
-日志是需要打印到日志文件，所以我们需要定义一个日志文件输出器。新建一个file.go文件。
+因为这个日志库主要输出日志到日志文件和控制台，默认日志输出器为控制台输出器。我们先来实现文件输出器。
+定义一个日志文件输出器。新建一个file.go文件。
 
 定义一个输出器结构体Outputer
 
@@ -125,7 +126,29 @@ func (f *FileOutputer)Close() {
 }
 ```
 以上就基本完成文件输出器的内容了，那我们再来定义控制台输出器模块，控制台输出器默认为日志库的日志输出器。
-新建console.go文件
+新建console.go文件,i前面提到过输出器中主要包含Write和Close这两个方法，还有实例化控制台输出器的方法NewConsoleOutputer
+先定义写方法
+```go
+func (c *ConsoleOutputer)Write(data *LogData) {
+	color := getLevelColor(data.level)
+	text := color.WithColor(string(data.Bytes()))
+	os.Stdout.Write([]byte(text))
+}
+```
+关闭方法因为控制台无任何资源需要释放所以方法里面无需写任何代码
+```go
+func (c *ConsoleOutputer)Close()  {
+
+}
+```
+定义实例化方法
+```go
+func NewConsoleOutputer() (log Outputer) {
+	log = &ConsoleOutputer{}
+	return
+}
+
+```
 
 
 
